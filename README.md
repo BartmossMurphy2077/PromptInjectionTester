@@ -28,16 +28,23 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 ### 3. Prepare your dataset
-1. Place your raw dataset (CSV) in the DatasetUnclean/ folder
+1. Place your raw dataset (CSV) in the `DatasetUnclean/` folder
 2. run the cleaning script
 ```bash
 python pandasCleaner.py
 ```
-3. This will create Datasets/cleaned_prompts.csv containing a single column called prompt
+3. This will create `Datasets/cleaned_prompts.csv` containing a single column called `prompt`
 ### 4. Run the project
 ```bash
 python src/main.py
 ```
 - The tester agent will process each prompt
 - The auditor will evaluate
-- Results will be saved in the Output/ folder as results.csv
+- Results will be saved in the `Output/` folder as `results.csv`
+#### Debug Feature
+
+In `src/main.py` there is a debug feature which you can use to limit the amount of prompts being tested.  
+It is automatically set to `TRUE` and the limit is set to 10 prompts.  
+
+- To turn it off, set `DEBUG` to `False`.  
+- To change the amount of prompts being tested in debug mode, edit the `DEBUG_LIMIT` value.
