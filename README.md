@@ -2,6 +2,7 @@
 
 This project is a simple two-agent system for testing prompt injections.  
 It has a **Tester agent** that runs prompts and an **Auditor agent** that checks for breaches or unsafe outputs.
+So far the implementation is oriented around Azure deployments. 
 
 ---
 
