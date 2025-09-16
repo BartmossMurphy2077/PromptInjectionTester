@@ -11,8 +11,18 @@ class Tester:
         self.deployment_name = AZURE_DEPLOYMENT_NAME
 
     def run(self, prompt: str) -> str:
-        response = self.client.chat.completions.create(
-            model=self.deployment_name,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content
+        try:
+            response = self.client.chat.completions.create(
+                model=self.deployment_name,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            # This will catch both prompt shield and any unexpected errors
+            error_message = str(e).lower()
+            if "prompt" in error_message or "shield" in error_message or "policy" in error_message or "content" in error_message:
+                print(f"[Tester] Prompt shield triggered: {e}")
+                return "PROMPTSHIELD"
+            else:
+                print(f"[Tester] Unexpected error: {e}")
+                return "UNEXPECTED"
