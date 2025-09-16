@@ -1,9 +1,11 @@
 .env
 .venv
 Datasets/*
+DatasetsUnclean/*
 Output/*
 .idea
 
 # Except these specific files we want to commit
 !Datasets/example_cleaned_prompts.csv
+!DatasetsUnclean/example_unclean_dataset.csv
 !Output/example_result.csv
