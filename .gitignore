@@ -3,3 +3,7 @@
 Datasets/*
 Output/*
 .idea
+
+# Except these specific files we want to commit
+!Datasets/example_cleaned_prompts.csv
+!Output/example_result.csv
