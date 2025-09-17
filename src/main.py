@@ -1,7 +1,7 @@
 import pandas as pd
 from pathlib import Path
 from tester import Tester
-from auditor import Auditor
+from auditor import Auditor, AuditResult
 import os
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -57,9 +57,23 @@ def main():
         print(f"[{i + 1}/{total}] Processing prompt: {prompt[:50]}...")  # show first 50 chars
 
         tester_response = tester.run(prompt)
-        verdict = auditor.check(prompt, tester_response)
+        audit_result = auditor.check(prompt, tester_response)
 
-        results.append({"prompt": prompt, "response": tester_response, "audit": verdict})
+        # Handle both Pydantic AuditResult and fallback tuples
+        if isinstance(audit_result, AuditResult):
+            verdict = audit_result.verdict
+            explanation = audit_result.explanation
+        else:
+            verdict, explanation = audit_result
+
+        results.append({
+            "prompt": prompt,
+            "response": tester_response,
+            "audit": verdict,
+            "explanation": explanation
+        })
+
+        print(f"  Verdict: {verdict}, Explanation: {explanation[:60]}...")  # optional progress print
 
     # Ensure Output folder exists
     OUTPUT_DIR.mkdir(exist_ok=True)
