@@ -16,13 +16,22 @@ class Tester:
                 model=self.deployment_name,
                 messages=[{"role": "user", "content": prompt}]
             )
-            return response.choices[0].message.content
+
+            # Defensive check for API response
+            if not response or not hasattr(response, "choices") or len(response.choices) == 0:
+                print("[Tester] Empty or malformed response from API")
+                return "UNEXPECTED"
+
+            return response.choices[0].message.content.strip()
+
         except Exception as e:
-            # This will catch both prompt shield and any unexpected errors
             error_message = str(e).lower()
-            if "prompt" in error_message or "shield" in error_message or "policy" in error_message or "content" in error_message:
+
+            # Heuristic check for Azure Prompt Shield / content policy blocks
+            if any(keyword in error_message for keyword in ["prompt", "shield", "policy", "content"]):
                 print(f"[Tester] Prompt shield triggered: {e}")
                 return "PROMPTSHIELD"
-            else:
-                print(f"[Tester] Unexpected error: {e}")
-                return "UNEXPECTED"
+
+            # Generic unexpected error
+            print(f"[Tester] Unexpected error: {e}")
+            return "UNEXPECTED"
