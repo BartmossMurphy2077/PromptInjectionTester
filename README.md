@@ -44,8 +44,9 @@ python src/main.py
 - Results will be saved in the `Output/` folder as `results.csv`
 #### Debug Feature
 
-In `src/main.py` there is a debug feature which you can use to limit the amount of prompts being tested.  
-It is automatically set to `TRUE` and the limit is set to 10 prompts.  
+In `src/utils.py` there is a debug feature which you can use to limit the amount of prompts being tested.  
+It is automatically set to `TRUE` and the limit is set to 10 prompts.
+`DEBUG` also allows you to see the amount of tokens consumed per prompt as well as see the total consumption at the end of the run.
 
 - To turn it off, set `DEBUG` to `False`.  
 - To change the amount of prompts being tested in debug mode, edit the `DEBUG_LIMIT` value.

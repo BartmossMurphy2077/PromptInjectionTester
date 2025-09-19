@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, ValidationError
 from typing import Literal
 import json, re
 from openai import AzureOpenAI
-from utils import AZURE_API_KEY, AZURE_API_BASE, AZURE_API_VERSION, AZURE_DEPLOYMENT_NAME
+from utils import AZURE_API_KEY, AZURE_API_BASE, AZURE_API_VERSION, AZURE_DEPLOYMENT_NAME, DEBUG
 
 class AuditResult(BaseModel):
     verdict: Literal["SAFE", "BREACH"]
@@ -17,10 +17,10 @@ class Auditor:
         )
         self.deployment_name = AZURE_DEPLOYMENT_NAME
 
-    def check(self, user_prompt: str, tester_response: str) -> AuditResult | tuple[str, str]:
+    def check(self, user_prompt: str, tester_response: str) -> tuple[AuditResult | tuple[str, str], int]:
         if tester_response in ["PROMPTSHIELD", "UNEXPECTED"]:
             print(f"[Auditor] Skipping audit because tester response is: {tester_response}")
-            return tester_response, "Audit skipped because tester failed"
+            return (tester_response, "Audit skipped because tester failed"), 0
 
         try:
             response = self.client.chat.completions.create(
@@ -47,32 +47,31 @@ class Auditor:
 
             content = response.choices[0].message.content.strip()
 
-            # Remove code blocks ```json ... ```
-            content = re.sub(r"^```json\s*|\s*```$", "", content, flags=re.MULTILINE).strip()
+            # Count tokens
+            usage = getattr(response, "usage", None)
+            tokens_used = getattr(usage, "total_tokens", 0) if usage else 0
 
-            # Remove outer quotes
+            # Clean JSON
+            content = re.sub(r"^```json\s*|\s*```$", "", content, flags=re.MULTILINE).strip()
             if (content.startswith('"') and content.endswith('"')) or \
                (content.startswith("'") and content.endswith("'")):
                 content = content[1:-1]
-
-            # Unescape inner quotes
             content = content.replace('\\"', '"').replace("\\'", "'")
 
-            # Parse JSON
             try:
                 parsed = json.loads(content)
-
-                # Normalize verdict to uppercase
                 if "verdict" in parsed:
                     parsed["verdict"] = parsed["verdict"].upper()
-
                 audit_result = AuditResult(**parsed)
             except (json.JSONDecodeError, ValidationError) as e:
                 print(f"[Auditor] Failed to parse/validate JSON: {e}\nRaw content: {content}")
-                return "AUDITOR_UNCLEAR", content
+                return ("AUDITOR_UNCLEAR", content), tokens_used
 
-            return audit_result
+            if(DEBUG):
+                print(f"[Auditor] Tokens used: {tokens_used}")
+
+            return audit_result, tokens_used
 
         except Exception as e:
             print(f"[Auditor] API blocked or error occurred: {e}")
-            return "AUDITOR_ERROR", str(e)
+            return ("AUDITOR_ERROR", str(e)), 0
