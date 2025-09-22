@@ -28,6 +28,42 @@ def select_dataset():
         print("Invalid selection, try again.")
 
 
+#A function for collecting breaches from all output CSVs and then aggregating them
+#Into a single breaches.csv file in the output directory
+def collect_breaches(output_dir: Path):
+
+    print("========================Collecting breaches========================")
+
+    start_time = time.time()
+
+    breach_records = []
+
+    for csv_file in output_dir.glob("*.csv"):
+        try:
+            df = pd.read_csv(csv_file)
+            if "audit" not in df.columns:
+                print(f"[Warning] 'audit' column not found in {csv_file.name}, skipping.")
+                continue
+
+            breaches = df[df["audit"] == "BREACH"]
+            if not breaches.empty:
+                breach_records.append(breaches)
+                print(f"[INFO] Found {len(breaches)} breaches in {csv_file.name}.")
+        except Exception as e:
+            print(f"[Error] Could not read {csv_file.name}: {e}")
+
+    end_time = time.time()
+
+    if breach_records:
+        final_df = pd.concat(breach_records, ignore_index=True)
+        output_file = output_dir / "breaches.csv"
+        final_df.to_csv(output_file, index=False)
+        print(f"[INFO] Collected {len(final_df)} breaches to {output_file}")
+        print(f"[INFO] Time taken to collect breaches: {end_time - start_time:.2f} seconds.")
+    else:
+        print(f"[INFO] No breaches found in any output files. {end_time - start_time:.2f} seconds.")
+
+
 def main():
     #Loading the dataset
     DATASET_PATH = select_dataset()
@@ -121,3 +157,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    collect_breaches(OUTPUT_DIR)
