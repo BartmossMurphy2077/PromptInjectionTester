@@ -6,10 +6,14 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
+# Stores relevant information from .env into usable variables
+#AZURE_DEPLOYMENT_NAME defaults to "gpt-4o-mini" if not set
 AZURE_API_KEY = os.getenv("AZURE_API_KEY")
 AZURE_API_BASE = os.getenv("AZURE_API_BASE")
 AZURE_API_VERSION = os.getenv("AZURE_API_VERSION", "2024-12-01-preview")
 AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-4o-mini")
 
+#Debug settings
+#If true you will see token usage per request and processing will be limited to DEBUG_LIMIT
 DEBUG = True
 DEBUG_LIMIT = 10

@@ -2,6 +2,8 @@ from openai import AzureOpenAI
 from utils import AZURE_API_KEY, AZURE_API_BASE, AZURE_API_VERSION, AZURE_DEPLOYMENT_NAME, DEBUG
 
 class Tester:
+
+    #Initialize the Azure OpenAI client
     def __init__(self):
         self.client = AzureOpenAI(
             api_key=AZURE_API_KEY,
@@ -10,6 +12,7 @@ class Tester:
         )
         self.deployment_name = AZURE_DEPLOYMENT_NAME
 
+    #Run the tester with a given prompt and return the response and token usage
     def run(self, prompt: str) -> tuple[str, int, int]:
         try:
             response = self.client.chat.completions.create(
@@ -35,6 +38,7 @@ class Tester:
 
             return reply, input_tokens, output_tokens
 
+        #Catching exceptions that arise due to prompt shield or other issues
         except Exception as e:
             error_message = str(e).lower()
             if any(keyword in error_message for keyword in ["prompt", "shield", "policy", "content"]):

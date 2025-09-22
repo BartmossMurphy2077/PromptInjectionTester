@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATASET_DIR = ROOT / "Datasets"
 OUTPUT_DIR = ROOT / "Output"
 
-
+# UI for listing and selecting a dataset
 def select_dataset():
     csv_files = list(DATASET_DIR.glob("*.csv"))
     if not csv_files:
@@ -28,16 +28,20 @@ def select_dataset():
 
 
 def main():
+    #Loading the dataset
     DATASET_PATH = select_dataset()
     df = pd.read_csv(DATASET_PATH)
     df = df.dropna(subset=["prompt"]).reset_index(drop=True)
 
+    #DEBUG limit for testing
     if DEBUG:
         df = df.head(DEBUG_LIMIT)
 
+    #Creation of Tester and Auditor instances
     tester = Tester()
     auditor = Auditor()
 
+    #Processing each prompt
     results = []
     total = len(df)
     total_input_tokens = 0
@@ -45,27 +49,30 @@ def main():
 
     print(f"========================[Testing Model {AZURE_DEPLOYMENT_NAME}]========================")
 
+    #Main iteration loop
     for i, row in df.iterrows():
         print(f"*********************************[{i + 1}/{total}]*********************************")
         prompt = row["prompt"]
         print(f"Processing prompt: {prompt[:50]}...")
 
-        # Run Tester
+        # Runs tester and stores response and token usage
         tester_response, tester_input_tokens, tester_output_tokens = tester.run(prompt)
         total_input_tokens += tester_input_tokens
         total_output_tokens += tester_output_tokens
 
-        # Run Auditor
+        # Runs auditor and stores verdict, explanation, and token usage
         audit_result, auditor_input_tokens, auditor_output_tokens = auditor.check(prompt, tester_response)
         total_input_tokens += auditor_input_tokens
         total_output_tokens += auditor_output_tokens
 
+        #Error prevention if auditor skips
         if isinstance(audit_result, AuditResult):
             verdict = audit_result.verdict
             explanation = audit_result.explanation
         else:
             verdict, explanation = audit_result
 
+        #appends to the output
         results.append({
             "prompt": prompt,
             "response": tester_response,
@@ -73,6 +80,7 @@ def main():
             "explanation": explanation
         })
 
+        #DEBUG info for token consumption
         if DEBUG:
             print(f"[Tokens] - Tester: in={tester_input_tokens}, out={tester_output_tokens} | "
                   f"Auditor: in={auditor_input_tokens}, out={auditor_output_tokens} | "
@@ -81,6 +89,7 @@ def main():
 
         print(f"******************************END_OF_PROMPT******************************")
 
+    #Saving results to CSV
     OUTPUT_DIR.mkdir(exist_ok=True)
     output_file = OUTPUT_DIR / f"results_{DATASET_PATH.stem}.csv"
     out_df = pd.DataFrame(results)

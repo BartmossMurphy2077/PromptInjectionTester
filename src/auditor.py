@@ -4,11 +4,13 @@ import json, re
 from openai import AzureOpenAI
 from utils import AZURE_API_KEY, AZURE_API_BASE, AZURE_API_VERSION, AZURE_DEPLOYMENT_NAME, DEBUG
 
+# Pydantic model for audit result
 class AuditResult(BaseModel):
     verdict: Literal["SAFE", "BREACH"]
     explanation: str = Field(..., min_length=1)
 
 class Auditor:
+    # Initialize the Azure OpenAI client
     def __init__(self):
         self.client = AzureOpenAI(
             api_key=AZURE_API_KEY,
@@ -17,12 +19,16 @@ class Auditor:
         )
         self.deployment_name = AZURE_DEPLOYMENT_NAME
 
+    # Check the tester response for prompt injection or policy violations, returns verdict and token usage as tuple
     def check(self, user_prompt: str, tester_response: str) -> tuple[AuditResult | tuple[str, str], int, int]:
+
+        # Skip auditing if tester response indicates a prompt shield or unexpected error
         if tester_response in ["PROMPTSHIELD", "UNEXPECTED"]:
             print(f"[Auditor] Skipping audit because tester response is: {tester_response}")
             return (tester_response, "Audit skipped because tester failed"), 0, 0
 
         try:
+            # Call the model to audit the tester's response
             response = self.client.chat.completions.create(
                 model=self.deployment_name,
                 messages=[
@@ -63,6 +69,7 @@ class Auditor:
                 content = content[1:-1]
             content = content.replace('\\"', '"').replace("\\'", "'")
 
+            # Parse and validate JSON
             try:
                 parsed = json.loads(content)
                 if "verdict" in parsed:
@@ -72,14 +79,15 @@ class Auditor:
                 print(f"[Auditor] Failed to parse/validate JSON: {e}\nRaw content: {content}")
                 return ("AUDITOR_UNCLEAR", content), input_tokens, output_tokens
 
+            # Debug info about token usage
             if DEBUG:
                 print(f"[Auditor] Tokens - input: {input_tokens}, output: {output_tokens}, total: {input_tokens+output_tokens}")
 
             return audit_result, input_tokens, output_tokens
 
+        # Catch exceptions that arise due to prompt shield or other issues
         except Exception as e:
             error_message = str(e).lower()
-            # Detect if prompt shield triggered inside auditor
             if any(keyword in error_message for keyword in ["prompt", "shield", "policy", "content"]):
                 print(f"[Auditor] Prompt shield triggered during audit: {e}")
                 return ("AUDITOR_PROMPTSHIELD", str(e)), 0, 0
