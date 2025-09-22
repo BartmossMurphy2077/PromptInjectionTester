@@ -1,3 +1,4 @@
+import time
 import pandas as pd
 from pathlib import Path
 from tester import Tester
@@ -34,7 +35,8 @@ def main():
     df = df.dropna(subset=["prompt"]).reset_index(drop=True)
 
     #DEBUG limit for testing
-    if DEBUG:
+    if DEBUG_LIMIT > 0:
+        print(f"[DEBUG] Debug limit: {DEBUG_LIMIT}")
         df = df.head(DEBUG_LIMIT)
 
     #Creation of Tester and Auditor instances
@@ -47,7 +49,12 @@ def main():
     total_input_tokens = 0
     total_output_tokens = 0
 
+    #Timer to see how long the process takes
+    start_time = time.time()
+
     print(f"========================[Testing Model {AZURE_DEPLOYMENT_NAME}]========================")
+
+    print(f"Processing {total} prompts from {DATASET_PATH.name}")
 
     #Main iteration loop
     for i, row in df.iterrows():
@@ -89,6 +96,9 @@ def main():
 
         print(f"******************************END_OF_PROMPT******************************")
 
+    # Ending timer
+    end_time = time.time()
+
     #Saving results to CSV
     OUTPUT_DIR.mkdir(exist_ok=True)
     output_file = OUTPUT_DIR / f"results_{DATASET_PATH.stem}.csv"
@@ -97,6 +107,13 @@ def main():
 
     print("===============================================================================")
     print(f"Done! Results saved to {output_file}")
+
+    print(f"Time taken: {end_time - start_time:.2f} seconds")
+
+    verdict_counts = out_df['audit'].value_counts()
+    for verdict, count in verdict_counts.items():
+        print(f"{verdict}: {count}")
+
     if DEBUG:
         print(f"Total input tokens: {total_input_tokens}, Total output tokens: {total_output_tokens}, Grand total: {total_input_tokens + total_output_tokens}")
     print("===============================================================================")
