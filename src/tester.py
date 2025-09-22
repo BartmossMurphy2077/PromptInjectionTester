@@ -10,7 +10,7 @@ class Tester:
         )
         self.deployment_name = AZURE_DEPLOYMENT_NAME
 
-    def run(self, prompt: str) -> tuple[str, int]:
+    def run(self, prompt: str) -> tuple[str, int, int]:
         try:
             response = self.client.chat.completions.create(
                 model=self.deployment_name,
@@ -19,23 +19,27 @@ class Tester:
 
             if not response or not hasattr(response, "choices") or len(response.choices) == 0:
                 print("[Tester] Empty or malformed response from API")
-                return "UNEXPECTED", 0
+                return "UNEXPECTED", 0, 0
 
             reply = response.choices[0].message.content.strip()
 
             usage = getattr(response, "usage", None)
-            tokens_used = getattr(usage, "total_tokens", 0) if usage else 0
+            if usage:
+                input_tokens = getattr(usage, "prompt_tokens", 0)
+                output_tokens = getattr(usage, "completion_tokens", 0)
+            else:
+                input_tokens, output_tokens = 0, 0
 
-            if(DEBUG):
-                print(f"[Tester] Tokens used: {tokens_used}")
+            if DEBUG:
+                print(f"[Tester] Tokens - input: {input_tokens}, output: {output_tokens}, total: {input_tokens + output_tokens}")
 
-            return reply, tokens_used
+            return reply, input_tokens, output_tokens
 
         except Exception as e:
             error_message = str(e).lower()
             if any(keyword in error_message for keyword in ["prompt", "shield", "policy", "content"]):
                 print(f"[Tester] Prompt shield triggered: {e}")
-                return "PROMPTSHIELD", 0
+                return "PROMPTSHIELD", 0, 0
 
             print(f"[Tester] Unexpected error: {e}")
-            return "UNEXPECTED", 0
+            return "UNEXPECTED", 0, 0

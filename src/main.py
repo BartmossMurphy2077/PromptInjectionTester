@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 from tester import Tester
 from auditor import Auditor, AuditResult
-from utils import DEBUG, DEBUG_LIMIT
+from utils import DEBUG, DEBUG_LIMIT, AZURE_DEPLOYMENT_NAME
 import os
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -11,7 +11,6 @@ OUTPUT_DIR = ROOT / "Output"
 
 
 def select_dataset():
-    # List CSV files in Datasets
     csv_files = list(DATASET_DIR.glob("*.csv"))
     if not csv_files:
         print("No CSV files found in Datasets.")
@@ -21,7 +20,6 @@ def select_dataset():
     for i, file in enumerate(csv_files, 1):
         print(f"{i}. {file.name}")
 
-    # Interactive selection
     while True:
         choice = input(f"Select a dataset (1-{len(csv_files)}): ")
         if choice.isdigit() and 1 <= int(choice) <= len(csv_files):
@@ -30,7 +28,6 @@ def select_dataset():
 
 
 def main():
-    # Let user select dataset
     DATASET_PATH = select_dataset()
     df = pd.read_csv(DATASET_PATH)
     df = df.dropna(subset=["prompt"]).reset_index(drop=True)
@@ -43,16 +40,25 @@ def main():
 
     results = []
     total = len(df)
-    total_tokens = 0
+    total_input_tokens = 0
+    total_output_tokens = 0
+
+    print(f"========================[Testing Model {AZURE_DEPLOYMENT_NAME}]========================")
 
     for i, row in df.iterrows():
+        print(f"*********************************[{i + 1}/{total}]*********************************")
         prompt = row["prompt"]
-        print(f"[{i + 1}/{total}] Processing prompt: {prompt[:50]}...")
+        print(f"Processing prompt: {prompt[:50]}...")
 
-        tester_response, tester_tokens = tester.run(prompt)
-        audit_result, auditor_tokens = auditor.check(prompt, tester_response)
+        # Run Tester
+        tester_response, tester_input_tokens, tester_output_tokens = tester.run(prompt)
+        total_input_tokens += tester_input_tokens
+        total_output_tokens += tester_output_tokens
 
-        total_tokens += tester_tokens + auditor_tokens
+        # Run Auditor
+        audit_result, auditor_input_tokens, auditor_output_tokens = auditor.check(prompt, tester_response)
+        total_input_tokens += auditor_input_tokens
+        total_output_tokens += auditor_output_tokens
 
         if isinstance(audit_result, AuditResult):
             verdict = audit_result.verdict
@@ -67,18 +73,24 @@ def main():
             "explanation": explanation
         })
 
-        print(f"  Verdict: {verdict}, Explanation: {explanation[:60]}...")
+        if DEBUG:
+            print(f"[Tokens] - Tester: in={tester_input_tokens}, out={tester_output_tokens} | "
+                  f"Auditor: in={auditor_input_tokens}, out={auditor_output_tokens} | "
+                  f"Total: {tester_input_tokens + tester_output_tokens + auditor_input_tokens + auditor_output_tokens}")
+            print(f"[Verdict]: {verdict}, Explanation: {explanation[:60]}...")
+
+        print(f"******************************END_OF_PROMPT******************************")
 
     OUTPUT_DIR.mkdir(exist_ok=True)
     output_file = OUTPUT_DIR / f"results_{DATASET_PATH.stem}.csv"
     out_df = pd.DataFrame(results)
     out_df.to_csv(output_file, index=False)
 
-    print("===================================================")
+    print("===============================================================================")
     print(f"Done! Results saved to {output_file}")
-    if(DEBUG):
-        print(f"======Total tokens consumed: {total_tokens} ======")
-    print(f"==================================================")
+    if DEBUG:
+        print(f"Total input tokens: {total_input_tokens}, Total output tokens: {total_output_tokens}, Grand total: {total_input_tokens + total_output_tokens}")
+    print("===============================================================================")
 
 
 if __name__ == "__main__":
