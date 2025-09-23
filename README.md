@@ -5,6 +5,33 @@ It has a **Tester agent** that runs prompts and an **Auditor agent** that checks
 So far the implementation is oriented around Azure deployments. 
 
 ---
+## System Flow Diagram
+```mermaid
+ flowchart TD
+    subgraph CleaningPipeline [Dataset Cleaning]
+        A[User] --> |Uploads raw dataset| B[DatasetsUnclean]
+        B --> C[pandasCleaner.py]
+        C --> |Cleans the dataset and stores it|Datasets[Datasets]
+    end
+
+    subgraph MainLoop [Testing & Auditing Loop]
+        UI[main.py: Interactive UI] -->|Select dataset| Datasets
+        Datasets --> |Either loads the whole dataset or the ammount set by RUN_LIMIT| DataFrame[PromptInjectionDF]
+        DataFrame --> |Fetches the ith prompt| Tester[Tester: ingest prompt, return response + tokens]
+        Tester --> Auditor[Auditor: check response, return verdict + tokens]
+        Auditor --> ResultsDF[Append results to ResultsDF]
+        ResultsDF --> |main loop continues untill all prompts are processed, i++| DataFrame
+        ResultsDF --> |After all prompts are processed ResultDF is saved to Output as .csv| OutputFolder[Output folder]
+    end
+
+subgraph collectingBreaches[Breach aggregation]
+    method[collecting_breaches] --> |collecting_breaches aggregates all records with BREACH and saves them in Output as breaches.csv| OutputFolder
+    OutputFolder --> |collecting_breaches fetches all csv in folder| method
+end
+
+```
+
+---
 
 ## Setup
 
