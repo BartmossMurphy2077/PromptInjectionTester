@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import Path
 from tester import Tester
 from auditor import Auditor, AuditResult
-from utils import DEBUG, DEBUG_LIMIT, AZURE_DEPLOYMENT_NAME
+from utils import DEBUG, RUN_LIMIT, AZURE_DEPLOYMENT_NAME
 import os
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -71,9 +71,9 @@ def main():
     df = df.dropna(subset=["prompt"]).reset_index(drop=True)
 
     #DEBUG limit for testing
-    if DEBUG_LIMIT > 0:
-        print(f"[DEBUG] Debug limit: {DEBUG_LIMIT}")
-        df = df.head(DEBUG_LIMIT)
+    if RUN_LIMIT > 0:
+        print(f"[DEBUG] Debug limit: {RUN_LIMIT}")
+        df = df.head(RUN_LIMIT)
 
     #Creation of Tester and Auditor instances
     tester = Tester()

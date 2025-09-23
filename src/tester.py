@@ -1,5 +1,5 @@
 from openai import AzureOpenAI
-from utils import AZURE_API_KEY, AZURE_API_BASE, AZURE_API_VERSION, AZURE_DEPLOYMENT_NAME, DEBUG
+from utils import AZURE_API_KEY, AZURE_API_BASE, AZURE_API_VERSION, AZURE_DEPLOYMENT_NAME, TESTER_TEMPERATURE, DEBUG
 
 class Tester:
 
@@ -17,7 +17,8 @@ class Tester:
         try:
             response = self.client.chat.completions.create(
                 model=self.deployment_name,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
+                temperature=TESTER_TEMPERATURE
             )
 
             if not response or not hasattr(response, "choices") or len(response.choices) == 0:

@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, ValidationError
 from typing import Literal
 import json, re
 from openai import AzureOpenAI
-from utils import AZURE_API_KEY, AZURE_API_BASE, AZURE_API_VERSION, AZURE_DEPLOYMENT_NAME, DEBUG
+from utils import AZURE_API_KEY, AZURE_API_BASE, AZURE_API_VERSION, AZURE_DEPLOYMENT_NAME, AUDITOR_TEMPERATURE, DEBUG
 
 # Pydantic model for audit result
 class AuditResult(BaseModel):
@@ -49,7 +49,8 @@ class Auditor:
                             "Give me JSON with verdict and explanation."
                         )
                     }
-                ]
+                ],
+                temperature=AUDITOR_TEMPERATURE
             )
 
             content = response.choices[0].message.content.strip()
