@@ -70,8 +70,17 @@ python src/main.py
 - Results will be saved in the `Output/` folder as `results.csv`
 #### Extra Feature
 
+#### utils.py
 - In `src/utils.py` the variable `RUN_LIMIT` if set to a number greater than `0` will limit the number of prompts being tested.
 - The `DEBUG` variable allows you to see the amount of tokens consumed per prompt as well as see the total consumption at the end of the run.
 - To turn it off, set `DEBUG` to `False`.  
 - To disable the limit, set `RUN_LIMIT` to `0`.
 - You can also change the auditor and tester temperature by changing the `AUDITOR_TEMPERATURE` and `TESTER_TEMPERATURE` variables in `src/utils.py`.
+#### tokenStatistics.py
+- Once a dataset has been processed a new token_logs.csv will be created in the `Output/` folder.
+- This file contains the token consumption for each prompt tested.
+- You can run `tokenStatistics.py` to get a summary of the token consumption.
+- Run it with:
+```bash
+python tokenStatistics.py
+```
