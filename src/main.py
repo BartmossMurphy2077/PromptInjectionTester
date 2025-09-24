@@ -39,6 +39,9 @@ def collect_breaches(output_dir: Path):
     breach_records = []
 
     for csv_file in output_dir.glob("*.csv"):
+        if csv_file.name == "breaches.csv":
+            print(f"[INFO] Skipping breaches.csv file.")
+            continue
         try:
             df = pd.read_csv(csv_file)
             if "audit" not in df.columns:
