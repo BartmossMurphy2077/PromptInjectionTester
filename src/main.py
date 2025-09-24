@@ -103,7 +103,7 @@ def main():
         total_input_tokens += tester_input_tokens
         total_output_tokens += tester_output_tokens
 
-        # Runs auditor and stores verdict, explanation, and token usage
+        # Runs auditor and stores verdict, explanation, severity, and token usage
         audit_result, auditor_input_tokens, auditor_output_tokens = auditor.check(prompt, tester_response)
         total_input_tokens += auditor_input_tokens
         total_output_tokens += auditor_output_tokens
@@ -112,15 +112,19 @@ def main():
         if isinstance(audit_result, AuditResult):
             verdict = audit_result.verdict
             explanation = audit_result.explanation
+            severity = getattr(audit_result, "severity", None)
         else:
             verdict, explanation = audit_result
+            severity = None
 
         #appends to the output
         results.append({
             "prompt": prompt,
             "response": tester_response,
             "audit": verdict,
-            "explanation": explanation
+            "explanation": explanation,
+            "severity": severity,
+            "model": AZURE_DEPLOYMENT_NAME
         })
 
         #DEBUG info for token consumption
@@ -128,7 +132,7 @@ def main():
             print(f"[Tokens] - Tester: in={tester_input_tokens}, out={tester_output_tokens} | "
                   f"Auditor: in={auditor_input_tokens}, out={auditor_output_tokens} | "
                   f"Total: {tester_input_tokens + tester_output_tokens + auditor_input_tokens + auditor_output_tokens}")
-            print(f"[Verdict]: {verdict}, Explanation: {explanation[:60]}...")
+            print(f"[Verdict]: {verdict}, Severity: {severity}, Explanation: {explanation[:60]}...")
 
         print(f"******************************END_OF_PROMPT******************************")
 
@@ -137,21 +141,38 @@ def main():
 
     #Saving results to CSV
     OUTPUT_DIR.mkdir(exist_ok=True)
-    output_file = OUTPUT_DIR / f"results_{DATASET_PATH.stem}.csv"
+    output_file = OUTPUT_DIR / f"results_{DATASET_PATH.stem}_{AZURE_DEPLOYMENT_NAME}.csv"
     out_df = pd.DataFrame(results)
     out_df.to_csv(output_file, index=False)
 
     print("===============================================================================")
-    print(f"Done! Results saved to {output_file}")
+    print(f"\nDone! Results saved to {output_file}")
 
-    print(f"Time taken: {end_time - start_time:.2f} seconds")
+    print(f"\nTime taken: {end_time - start_time:.2f} seconds")
 
     verdict_counts = out_df['audit'].value_counts()
     for verdict, count in verdict_counts.items():
         print(f"{verdict}: {count}")
 
+    #asr scoring
+    num_breaches = verdict_counts.get("BREACH", 0)
+    asr = num_breaches/total
+    print(f"\nAttack Success Rate (ASR): {asr:.2%}")
+
+    # ISR scoring (severity distribution and average)
+    if "severity" in out_df.columns:
+        severity_counts = out_df["severity"].value_counts(dropna=False).sort_index()
+        print("\nSeverity distribution:")
+        for sev, count in severity_counts.items():
+            print(f"Severity {sev}: {count}")
+
+        # Calculate average severity (ignoring nulls)
+        avg_severity = out_df["severity"].dropna().mean()
+        print(f"Average Severity: {avg_severity:.2f}")
+
+
     if DEBUG:
-        print(f"Total input tokens: {total_input_tokens}, Total output tokens: {total_output_tokens}, Grand total: {total_input_tokens + total_output_tokens}")
+        print(f"\nTotal input tokens: {total_input_tokens}, Total output tokens: {total_output_tokens}, Grand total: {total_input_tokens + total_output_tokens}")
     print("===============================================================================")
 
 

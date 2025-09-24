@@ -21,11 +21,20 @@ class Tester:
                 temperature=TESTER_TEMPERATURE
             )
 
+            #checks if response was received
             if not response or not hasattr(response, "choices") or len(response.choices) == 0:
                 print("[Tester] Empty or malformed response from API")
                 return "UNEXPECTED", 0, 0
 
-            reply = response.choices[0].message.content.strip()
+            #checks if content is present in the response
+            reply_obj = response.choices[0].message
+            reply_content = getattr(reply_obj, "content", None)
+
+            if not reply_content:
+                print("[Tester] Warning: Empty response content from API")
+                return "UNEXPECTED", 0, 0
+
+            reply = reply_content.strip()
 
             usage = getattr(response, "usage", None)
             if usage:
