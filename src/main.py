@@ -39,8 +39,8 @@ def collect_breaches(output_dir: Path):
     breach_records = []
 
     for csv_file in output_dir.glob("*.csv"):
-        if csv_file.name == "breaches.csv":
-            print(f"[INFO] Skipping breaches.csv file.")
+        if csv_file.name == "breaches.csv" or csv_file.name == "token_logs.csv":
+            print(f"[INFO] Skipping breaches.csv file or token_logs.csv.")
             continue
         try:
             df = pd.read_csv(csv_file)
@@ -88,6 +88,8 @@ def main():
     total_input_tokens = 0
     total_output_tokens = 0
 
+    token_logs = []
+
     #Timer to see how long the process takes
     start_time = time.time()
 
@@ -130,6 +132,17 @@ def main():
             "model": AZURE_DEPLOYMENT_NAME
         })
 
+        #appends to token results for potential future analysis
+        token_logs.append({
+            "model": AZURE_DEPLOYMENT_NAME,
+            "dataset_name": DATASET_PATH.stem,
+            "prompt": prompt,
+            "tester_input_tokens": tester_input_tokens,
+            "tester_output_tokens": tester_output_tokens,
+            "auditor_input_tokens": auditor_input_tokens,
+            "auditor_output_tokens": auditor_output_tokens
+        })
+
         #DEBUG info for token consumption
         if DEBUG:
             print(f"[Tokens] - Tester: in={tester_input_tokens}, out={tester_output_tokens} | "
@@ -148,8 +161,17 @@ def main():
     out_df = pd.DataFrame(results)
     out_df.to_csv(output_file, index=False)
 
+    #saving token logs to CSV
+    token_file = OUTPUT_DIR / f"token_logs.csv"
+    token_df = pd.DataFrame(token_logs)
+    if token_file.exists():
+        token_df.to_csv(token_file, mode='a', header=False, index=False)
+    else:
+        token_df.to_csv(token_file, index=False)
+
     print("===============================================================================")
     print(f"\nDone! Results saved to {output_file}")
+    print(f"\nToken logs saved to {token_file}")
 
     print(f"\nTime taken: {end_time - start_time:.2f} seconds")
 
