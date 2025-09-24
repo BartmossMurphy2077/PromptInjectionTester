@@ -40,7 +40,7 @@ def collect_breaches(output_dir: Path):
 
     for csv_file in output_dir.glob("*.csv"):
         if csv_file.name == "breaches.csv" or csv_file.name == "token_logs.csv":
-            print(f"[INFO] Skipping breaches.csv file or token_logs.csv.")
+            print(f"[INFO] Skipping {csv_file.name}.")
             continue
         try:
             df = pd.read_csv(csv_file)
