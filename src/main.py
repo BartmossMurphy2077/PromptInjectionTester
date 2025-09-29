@@ -118,17 +118,20 @@ def main():
             verdict = audit_result.verdict
             explanation = audit_result.explanation
             severity = getattr(audit_result, "severity", None)
+            category = getattr(audit_result, "category", "others")
         else:
             verdict, explanation = audit_result
             severity = None
+            category = "others"
 
-        #appends to the output
+        # Append results
         results.append({
             "prompt": prompt,
             "response": tester_response,
             "audit": verdict,
             "explanation": explanation,
             "severity": severity,
+            "category": category,
             "model": AZURE_DEPLOYMENT_NAME
         })
 
