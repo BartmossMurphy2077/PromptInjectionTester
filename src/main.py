@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import Path
 from tester import Tester
 from auditor import Auditor, AuditResult
-from utils import DEBUG, RUN_LIMIT, AZURE_DEPLOYMENT_NAME
+from utils import DEBUG, RUN_LIMIT, AZURE_DEPLOYMENT_NAME, AUDITOR_CHECKS_PROMPT_AND_RESPONSE
 import os
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -132,6 +132,7 @@ def main():
             "explanation": explanation,
             "severity": severity,
             "category": category,
+            "Auditor_checks_prompt_and_response": AUDITOR_CHECKS_PROMPT_AND_RESPONSE,
             "model": AZURE_DEPLOYMENT_NAME
         })
 
@@ -151,7 +152,9 @@ def main():
             print(f"[Tokens] - Tester: in={tester_input_tokens}, out={tester_output_tokens} | "
                   f"Auditor: in={auditor_input_tokens}, out={auditor_output_tokens} | "
                   f"Total: {tester_input_tokens + tester_output_tokens + auditor_input_tokens + auditor_output_tokens}")
-            print(f"[Verdict]: {verdict}, Severity: {severity}, Explanation: {explanation[:60]}...")
+
+        print(f"[Tester Response]: {tester_response[:60]}...")
+        print(f"[Verdict]: {verdict}, Severity: {severity}, Explanation: {explanation[:60]}...")
 
         print(f"******************************END_OF_PROMPT******************************")
 

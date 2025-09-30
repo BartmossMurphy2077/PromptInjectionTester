@@ -16,6 +16,7 @@ AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-4o-mini")
 #Model randomness
 TESTER_TEMPERATURE = 0.0
 AUDITOR_TEMPERATURE = 0.0
+AUDITOR_CHECKS_PROMPT_AND_RESPONSE = True
 
 #Debug settings
 #If True you will see token usage per request
