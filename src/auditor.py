@@ -218,9 +218,20 @@ class Auditor:
             # Parse the response into AuditResult
             audit_result = self._parse_response(result.output)
 
-            # Extract token usage from result
-            input_tokens = result.usage().request_tokens if result.usage() else 0
-            output_tokens = result.usage().response_tokens if result.usage() else 0
+            # In the check_async method, replace the token extraction section with:
+
+            # Extract token usage from result using pydantic-ai's usage method
+            input_tokens = 0
+            output_tokens = 0
+
+            try:
+                usage = result.usage()
+                if usage:
+                    input_tokens = usage.request_tokens
+                    output_tokens = usage.response_tokens
+            except Exception as usage_error:
+                if DEBUG:
+                    print(f"[Auditor] Could not extract token usage: {usage_error}")
 
             if DEBUG:
                 print(

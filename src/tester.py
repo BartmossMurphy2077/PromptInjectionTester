@@ -35,7 +35,7 @@ class Tester:
                 print("[Tester] No result returned from API")
                 return "UNEXPECTED", 0, 0
 
-            # Get the response content from output attribute (same as auditor)
+            # Get the response content from output attribute
             reply_content = result.output
             if reply_content is None:
                 print("[Tester] Warning: None response content from API")
@@ -47,15 +47,15 @@ class Tester:
                 print("[Tester] Warning: Empty response content after processing")
                 return "UNEXPECTED", 0, 0
 
-            # Extract token usage from result (same pattern as auditor)
+            # Extract token usage from result using pydantic-ai's usage method
             input_tokens = 0
             output_tokens = 0
 
             try:
-                if hasattr(result, 'usage') and result.usage:
-                    usage = result.usage
-                    input_tokens = getattr(usage, 'request_tokens', 0) or 0
-                    output_tokens = getattr(usage, 'response_tokens', 0) or 0
+                usage = result.usage()
+                if usage:
+                    input_tokens = usage.request_tokens
+                    output_tokens = usage.response_tokens
             except Exception as usage_error:
                 if DEBUG:
                     print(f"[Tester] Could not extract token usage: {usage_error}")
