@@ -1,59 +1,85 @@
-from openai import AzureOpenAI
+from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.azure import AzureProvider
 from utils import AZURE_API_KEY, AZURE_API_BASE, AZURE_API_VERSION, AZURE_DEPLOYMENT_NAME, TESTER_TEMPERATURE, DEBUG
 
 class Tester:
-
-    #Initialize the Azure OpenAI client
     def __init__(self):
-        self.client = AzureOpenAI(
-            api_key=AZURE_API_KEY,
+        # Create Azure provider
+        azure_provider = AzureProvider(
             azure_endpoint=AZURE_API_BASE,
-            api_version=AZURE_API_VERSION
+            api_version=AZURE_API_VERSION,
+            api_key=AZURE_API_KEY,
         )
-        self.deployment_name = AZURE_DEPLOYMENT_NAME
 
-    #Run the tester with a given prompt and return the response and token usage
-    def run(self, prompt: str) -> tuple[str, int, int]:
+        # Create OpenAI chat model with Azure provider
+        self.model = OpenAIChatModel(
+            AZURE_DEPLOYMENT_NAME,
+            provider=azure_provider,
+        )
+
+        # Create pydantic-ai agent (no system prompt - just respond to user prompts)
+        self.agent = Agent(
+            model=self.model,
+        )
+
+    async def run_async(self, prompt: str) -> tuple[str, int, int]:
         try:
-            response = self.client.chat.completions.create(
-                model=self.deployment_name,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=TESTER_TEMPERATURE
+            result = await self.agent.run(
+                prompt,
+                model_settings={'temperature': TESTER_TEMPERATURE}
             )
 
-            #checks if response was received
-            if not response or not hasattr(response, "choices") or len(response.choices) == 0:
-                print("[Tester] Empty or malformed response from API")
+            # Check if result exists
+            if not result:
+                print("[Tester] No result returned from API")
                 return "UNEXPECTED", 0, 0
 
-            #checks if content is present in the response
-            reply_obj = response.choices[0].message
-            reply_content = getattr(reply_obj, "content", None)
-
-            if not reply_content:
-                print("[Tester] Warning: Empty response content from API")
+            # Get the response content from output attribute (same as auditor)
+            reply_content = result.output
+            if reply_content is None:
+                print("[Tester] Warning: None response content from API")
                 return "UNEXPECTED", 0, 0
 
-            reply = reply_content.strip()
+            # Convert to string and strip
+            reply = str(reply_content).strip()
+            if not reply:
+                print("[Tester] Warning: Empty response content after processing")
+                return "UNEXPECTED", 0, 0
 
-            usage = getattr(response, "usage", None)
-            if usage:
-                input_tokens = getattr(usage, "prompt_tokens", 0)
-                output_tokens = getattr(usage, "completion_tokens", 0)
-            else:
-                input_tokens, output_tokens = 0, 0
+            # Extract token usage from result (same pattern as auditor)
+            input_tokens = 0
+            output_tokens = 0
+
+            try:
+                if hasattr(result, 'usage') and result.usage:
+                    usage = result.usage
+                    input_tokens = getattr(usage, 'request_tokens', 0) or 0
+                    output_tokens = getattr(usage, 'response_tokens', 0) or 0
+            except Exception as usage_error:
+                if DEBUG:
+                    print(f"[Tester] Could not extract token usage: {usage_error}")
 
             if DEBUG:
                 print(f"[Tester] Tokens - input: {input_tokens}, output: {output_tokens}, total: {input_tokens + output_tokens}")
 
             return reply, input_tokens, output_tokens
 
-        #Catching exceptions that arise due to prompt shield or other issues
         except Exception as e:
             error_message = str(e).lower()
-            if any(keyword in error_message for keyword in ["prompt", "shield", "policy", "content"]):
+
+            # Check for prompt shield triggers
+            if any(keyword in error_message for keyword in ["prompt", "shield", "policy", "content", "filtered"]):
                 print(f"[Tester] Prompt shield triggered: {e}")
                 return "PROMPTSHIELD", 0, 0
 
             print(f"[Tester] Unexpected error: {e}")
+            return "UNEXPECTED", 0, 0
+
+    def run(self, prompt: str) -> tuple[str, int, int]:
+        import asyncio
+        try:
+            return asyncio.run(self.run_async(prompt))
+        except Exception as e:
+            print(f"[Tester] Async execution error: {e}")
             return "UNEXPECTED", 0, 0

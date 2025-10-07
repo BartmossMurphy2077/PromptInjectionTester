@@ -216,7 +216,7 @@ class Auditor:
             )
 
             # Parse the response into AuditResult
-            audit_result = self._parse_response(result.data)
+            audit_result = self._parse_response(result.output)
 
             # Extract token usage from result
             input_tokens = result.usage().request_tokens if result.usage() else 0

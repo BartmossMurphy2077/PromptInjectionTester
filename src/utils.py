@@ -14,12 +14,12 @@ AZURE_API_VERSION = os.getenv("AZURE_API_VERSION", "2024-12-01-preview")
 AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-4o-mini")
 
 #Model randomness
-TESTER_TEMPERATURE = 0.0
-AUDITOR_TEMPERATURE = 0.0
+TESTER_TEMPERATURE = 1
+AUDITOR_TEMPERATURE = 1
 AUDITOR_CHECKS_PROMPT_AND_RESPONSE = True
 
 #Debug settings
 #If True you will see token usage per request
 #If RUN_LIMIT > 0 the dataset will be limited to that many entries for faster testing
 DEBUG = True
-RUN_LIMIT = 10
+RUN_LIMIT = 0
