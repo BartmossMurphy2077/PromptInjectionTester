@@ -155,14 +155,14 @@ class Auditor(AzureAgent):
             auto = self._auto_flag(tester_response)
             if auto:
                 if DEBUG:
-                    print(f"[Auditor] Auto-flagged by regex as {auto.category}, severity {auto.severity}")
+                    print(f"[Auditor] Auto-flagged by regex as {auto.category}, severity {auto.severity} (no LLM tokens used)")
                 return auto, 0, 0
 
             if AUDITOR_CHECKS_PROMPT_AND_RESPONSE:
                 auto_prompt = self._auto_flag(user_prompt)
                 if auto_prompt:
                     if DEBUG:
-                        print(f"[Auditor] Auto-flagged by prompt regex as {auto_prompt.category}, severity {auto_prompt.severity}")
+                        print(f"[Auditor] Auto-flagged by prompt regex as {auto_prompt.category}, severity {auto_prompt.severity} (no LLM tokens used)")
                     return auto_prompt, 0, 0
 
             # Prepare content for LLM
@@ -188,8 +188,11 @@ class Auditor(AzureAgent):
             # Use the base class run_async method
             response, input_tokens, output_tokens = await self.run_async(prompt)
 
+            if DEBUG:
+                print(f"[Auditor] LLM tokens - input: {input_tokens}, output: {output_tokens}, total: {input_tokens + output_tokens}")
+
             if response in ["PROMPTSHIELD", "UNEXPECTED"]:
-                return (f"AUDITOR_{response}", "Auditor failed to process"), 0, 0
+                return (f"AUDITOR_{response}", "Auditor failed to process"), input_tokens, output_tokens
 
             # Parse the response into AuditResult
             audit_result = self._parse_response(response)
