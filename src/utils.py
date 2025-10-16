@@ -18,6 +18,9 @@ TESTER_TEMPERATURE = 1
 AUDITOR_TEMPERATURE = 1
 AUDITOR_CHECKS_PROMPT_AND_RESPONSE = True
 
+#Concurrency limit
+CONCURRENCY_LIMIT = 20
+
 #Debug settings
 #If True you will see token usage per request
 #If RUN_LIMIT > 0 the dataset will be limited to that many entries for faster testing
