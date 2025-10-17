@@ -1,32 +1,34 @@
 # Prompt Injection Tester
 
 This project is a simple two-agent system for testing prompt injections.  
-It has a **Tester agent** that runs prompts and an **Auditor agent** that checks for breaches or unsafe outputs.
-So far the implementation is oriented around Azure deployments. 
+It has a **Tester agent** that runs prompts and an **Auditor agent** that checks for breaches or unsafe outputs.  
+The implementation is now fully **asynchronous** and optimized for faster evaluation.  
 
 ---
+
 ## System Flow Diagram
+
 ```mermaid
- flowchart TD
+flowchart TD
     subgraph CleaningPipeline [Dataset Cleaning]
         A[User] --> |Uploads raw dataset| B[DatasetsUnclean]
         B --> |pandasCleaner.py only accesses .csv files in this folder| C[pandasCleaner.py]
         C --> |Cleans the dataset and stores it|Datasets[Datasets]
     end
 
-    subgraph MainLoop [Testing & Auditing Loop]
+    subgraph AsyncMainLoop [Async Testing & Auditing Loop]
         UI[main.py: Interactive UI] -->|Select dataset| Datasets
-        Datasets --> |Either loads the whole dataset or the amount set by RUN_LIMIT| DataFrame[PromptInjectionDF]
+        Datasets --> |Loads full dataset or limited by RUN_LIMIT| DataFrame[PromptInjectionDF]
         DataFrame --> |Fetches the ith prompt| Tester[Tester: ingest prompt, return response + tokens]
         Tester --> Auditor[Auditor: check response, return verdict + tokens]
         Auditor --> ResultsDF[Append results to ResultsDF]
-        ResultsDF --> |main loop continues until all prompts are processed| DataFrame
-        ResultsDF --> |After all prompts are processed ResultDF is saved to Output as .csv file| OutputFolder[Output folder]
+        ResultsDF --> |Loop continues asynchronously until all prompts are processed| DataFrame
+        ResultsDF --> |ResultsDF is saved to Output folder as .csv| OutputFolder[Output folder]
     end
 
 subgraph collectingBreaches[Breach aggregation]
-    method[collecting_breaches] --> |collecting_breaches aggregates all records with BREACH and saves them in Output as breaches.csv| OutputFolder
-    OutputFolder --> |collecting_breaches fetches all csv in folder| method
+    method[collecting_breaches_from_eval_output] --> |Aggregates all BREACH records into breaches.csv| OutputFolder
+    OutputFolder --> |Fetches all CSV files| method
 end
 ```
 
@@ -68,6 +70,7 @@ python src/main.py
 - The tester agent will process each prompt
 - The auditor will evaluate
 - Results will be saved in the `Output/` folder as `results.csv`
+- Prompts are processed asynchronously for speed improvement 
 #### Extra Feature
 
 #### utils.py
@@ -77,6 +80,7 @@ python src/main.py
 - To disable the limit, set `RUN_LIMIT` to `0`.
 - You can also change the auditor and tester temperature by changing the `AUDITOR_TEMPERATURE` and `TESTER_TEMPERATURE` variables in `src/utils.py`.
 - `AUDITOR_CHECKS_PROMPT_AND_RESPONSE` if set to `True` will make the auditor check both the prompt and the response for breaches. If set to `False` it will only check the response.
+- `CONCURRENCY_LIMIT` controls how many prompts are processed simultaneously. Increase it for faster processing if you have a good internet connection and API rate limits allow it.
 #### tokenStatistics.py
 - Once a dataset has been processed a new token_logs.csv will be created in the `Output/` folder.
 - This file contains the token consumption for each prompt tested.
