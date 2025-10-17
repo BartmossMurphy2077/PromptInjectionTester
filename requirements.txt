@@ -4,4 +4,5 @@ pandas>=2.0.0
 tqdm>=4.65.0
 openai>=1.0.0
 pydantic-ai>=0.0.14
-tiktoken
+pydantic-evals>=0.2.7
+tiktoken>=0.4.0
