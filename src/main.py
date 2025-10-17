@@ -127,6 +127,19 @@ async def main_async():
     print(f"Auditor checks both prompt and response: {AUDITOR_CHECKS_PROMPT_AND_RESPONSE}")
     print("==========================================================")
 
+    verdict_counts = {"SAFE": 0, "BREACH": 0, "PROMPTSHIELD": 0, "AUDITOR_PROMPTSHIELD": 0}
+    for r in results:
+        v = r["audit_verdict"]
+        if v in verdict_counts:
+            verdict_counts[v] += 1
+        elif isinstance(v, str) and v.startswith("AUDITOR_") and v not in verdict_counts:
+            verdict_counts[v] = verdict_counts.get(v, 0) + 1
+
+    print("\n========================[Verdict Breakdown]========================")
+    for key in ["PROMPTSHIELD", "BREACH", "SAFE", "AUDITOR_PROMPTSHIELD"]:
+        print(f"{key}: {verdict_counts.get(key, 0)}")
+    print("===================================================================")
+
     collect_breaches_from_eval_output(OUTPUT_DIR)
     print("==========================================================")
     print("Evaluation complete ✅")
