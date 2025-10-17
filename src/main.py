@@ -1,7 +1,6 @@
 import asyncio
 import time
 from pathlib import Path
-
 import pandas as pd
 from pydantic_evals import Case, Dataset
 
@@ -20,31 +19,32 @@ DATASET_DIR = ROOT / "Datasets"
 OUTPUT_DIR = ROOT / "Output"
 
 
-async def task_fn(prompt: str) -> dict:
-    """
-    This is the “task” Evals will call for each Case.inputs.
-    We return a dict output; we also record metrics in ctx.attributes.
-    """
-    # instantiate testers / auditors at top-level to reuse connections? or globally
+async def task_fn(prompt: str, i: int = None, total: int = None) -> dict:
+    """Async task executed for each prompt."""
+    if i is not None and total is not None:
+        print(f"\n*********************************[{i + 1}/{total}]*********************************")
+        print(f"Processing prompt: {prompt[:80]}...")
+
     resp, in_t, out_t = await task_fn.tester.run_async(prompt)
     audit_result, in_a, out_a = await task_fn.auditor.check_async(prompt, resp)
 
-    # Normalize audit_result into structured form
     if isinstance(audit_result, AuditResult):
         verdict = audit_result.verdict
         explanation = audit_result.explanation
-        severity = audit_result.severity
-        category = audit_result.category
+        severity = getattr(audit_result, "severity", None)
+        category = getattr(audit_result, "category", "others")
     else:
         verdict, explanation = audit_result
         severity = None
-        category = None
+        category = "others"
 
-    # You can access `ctx` via `pydantic_evals.current_context()` if needed,
-    # but the cleaner pattern is to return attributes in the output,
-    # then do a post-walk to dump them.
+    if DEBUG:
+        print(f"[Tester Response]: {resp[:80]}...")
+        print(f"[Verdict]: {verdict}, Severity: {severity}, Explanation: {explanation[:80]}...")
+        print(f"******************************END_OF_PROMPT******************************")
 
     return {
+        "prompt": prompt,
         "response": resp,
         "audit_verdict": verdict,
         "audit_explanation": explanation,
@@ -58,50 +58,82 @@ async def task_fn(prompt: str) -> dict:
 
 
 def build_dataset_from_csv(csv_path: Path) -> Dataset:
-    import pandas as pd
     df = pd.read_csv(csv_path).dropna(subset=["prompt"]).reset_index(drop=True)
-
     if RUN_LIMIT > 0:
         print(f"[DEBUG] Debug limit: {RUN_LIMIT}")
         df = df.head(RUN_LIMIT)
-
-    cases = []
-    for idx, row in df.iterrows():
-        cases.append(Case(name=f"case_{idx}", inputs=row["prompt"]))
+    cases = [Case(name=f"case_{i}", inputs=row["prompt"]) for i, row in df.iterrows()]
     return Dataset(cases=cases)
-
-
-def main():
-    # (Synchronous entry point wrapping async)
-    asyncio.run(main_async())
 
 
 async def main_async():
     DATASET_PATH = select_dataset(DATASET_DIR)
     dataset = build_dataset_from_csv(DATASET_PATH)
 
-    # Bind tester / auditor to task_fn
     tester = Tester()
     auditor = Auditor()
     task_fn.tester = tester
     task_fn.auditor = auditor
 
-    print(f"========================[Evaluating Model {AZURE_DEPLOYMENT_NAME}]========================")
-    print(f"Dataset: {DATASET_PATH.name}, Cases: {len(dataset.cases)}")
+    total_cases = len(dataset.cases)
+    print(f"\n========================[Evaluating Model {AZURE_DEPLOYMENT_NAME}]========================")
+    print(f"Dataset: {DATASET_PATH.name}, Cases: {total_cases}")
+    print("==============================================================================")
 
     start_time = time.time()
 
-    # Use `evaluate`: the async evaluation method
-    report = await dataset.evaluate(task_fn, max_concurrency=CONCURRENCY_LIMIT)
+    # Manual async handling (since pydantic-evals evaluate_async is deprecated)
+    semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+
+    async def wrapped_task(case, i):
+        async with semaphore:
+            return await task_fn(case.inputs, i, total_cases)
+
+    tasks = [wrapped_task(case, i) for i, case in enumerate(dataset.cases)]
+    results = await asyncio.gather(*tasks)
 
     end_time = time.time()
     total_time = end_time - start_time
 
-    # Dump outputs
-    write_eval_outputs(report, OUTPUT_DIR, dataset_name=DATASET_PATH.stem, model_name=AZURE_DEPLOYMENT_NAME)
-    collect_breaches_from_eval_output(OUTPUT_DIR)
+    # Save results
+    print("\n========================[Saving Outputs]========================")
 
-    print(f"Completed evaluation in {total_time:.2f}s")
+    # Fake "report" object to reuse write_eval_outputs()
+    class SimpleCase:
+        def __init__(self, inputs, output):
+            self.inputs = inputs
+            self.output = output
+
+    class SimpleReport:
+        def __init__(self, cases):
+            self.cases = cases
+
+    fake_report = SimpleReport([
+        SimpleCase(r["prompt"], r) for r in results
+    ])
+
+    write_eval_outputs(fake_report, OUTPUT_DIR, dataset_name=DATASET_PATH.stem, model_name=AZURE_DEPLOYMENT_NAME)
+
+    # Compute token totals
+    total_input_tokens = sum((r["tester_input_tokens"] or 0) + (r["auditor_input_tokens"] or 0) for r in results)
+    total_output_tokens = sum((r["tester_output_tokens"] or 0) + (r["auditor_output_tokens"] or 0) for r in results)
+
+    print(f"\n========================[Summary]========================")
+    print(f"Total prompts tested: {total_cases}")
+    print(f"Total time: {total_time:.2f}s")
+    print(f"Concurrency limit: {CONCURRENCY_LIMIT}")
+    print(f"Total input tokens: {total_input_tokens}")
+    print(f"Total output tokens: {total_output_tokens}")
+    print(f"Auditor checks both prompt and response: {AUDITOR_CHECKS_PROMPT_AND_RESPONSE}")
+    print("==========================================================")
+
+    collect_breaches_from_eval_output(OUTPUT_DIR)
+    print("==========================================================")
+    print("Evaluation complete ✅")
+
+
+def main():
+    asyncio.run(main_async())
 
 
 if __name__ == "__main__":
