@@ -6,3 +6,4 @@ openai>=1.0.0
 pydantic-ai>=0.0.14
 pydantic-evals>=0.2.7
 tiktoken>=0.4.0
+deepeval

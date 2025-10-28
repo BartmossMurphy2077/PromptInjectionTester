@@ -1,5 +1,7 @@
 .env
 .venv
+src/.env.local
+.deepeval
 Datasets/*
 DatasetsUnclean/*
 Output/*
