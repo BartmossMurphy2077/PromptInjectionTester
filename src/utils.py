@@ -25,4 +25,9 @@ CONCURRENCY_LIMIT = 20
 #If True you will see token usage per request
 #If RUN_LIMIT > 0 the dataset will be limited to that many entries for faster testing
 DEBUG = True
-RUN_LIMIT = 300
+RUN_LIMIT = 0
+
+#Preprocessing settings
+#If 1, applies regex auto-flagging and sanitization before sending to auditor
+#If 0, sends raw prompts directly to auditor (useful when Azure prompt shield is enabled)
+PREPROCESS = 0
