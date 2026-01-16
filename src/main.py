@@ -8,15 +8,17 @@ from tester import Tester
 from auditor import Auditor, AuditResult
 from utils import (
     DEBUG, RUN_LIMIT, AZURE_DEPLOYMENT_NAME, AUDITOR_CHECKS_PROMPT_AND_RESPONSE,
-    CONCURRENCY_LIMIT
+    CONCURRENCY_LIMIT, CHECKPOINTING, CHECKPOINTING_LENGTH
 )
 from eval_helpers import (
-    select_dataset, write_eval_outputs, collect_breaches_from_eval_output
+    select_dataset, write_eval_outputs, collect_breaches_from_eval_output,
+    save_checkpoint, merge_checkpoints
 )
 
 ROOT = Path(__file__).resolve().parent.parent
 DATASET_DIR = ROOT / "Datasets"
 OUTPUT_DIR = ROOT / "Output"
+CHECKPOINT_DIR = ROOT / "Checkpoints"
 
 
 async def task_fn(prompt: str, i: int = None, total: int = None) -> dict:
@@ -78,41 +80,77 @@ async def main_async():
     total_cases = len(dataset.cases)
     print(f"\n========================[Evaluating Model {AZURE_DEPLOYMENT_NAME}]========================")
     print(f"Dataset: {DATASET_PATH.name}, Cases: {total_cases}")
+    if CHECKPOINTING:
+        print(f"Checkpointing enabled: saving every {CHECKPOINTING_LENGTH} results")
     print("==============================================================================")
 
     start_time = time.time()
 
-    # Manual async handling (since pydantic-evals evaluate_async is deprecated)
+    # Manual async handling with checkpointing
     semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+    results = []
+    checkpoint_counter = 0
 
     async def wrapped_task(case, i):
         async with semaphore:
             return await task_fn(case.inputs, i, total_cases)
 
-    tasks = [wrapped_task(case, i) for i, case in enumerate(dataset.cases)]
-    results = await asyncio.gather(*tasks)
+    # Process in batches if checkpointing is enabled
+    if CHECKPOINTING:
+        CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+
+        for batch_start in range(0, total_cases, CHECKPOINTING_LENGTH):
+            batch_end = min(batch_start + CHECKPOINTING_LENGTH, total_cases)
+            batch_cases = dataset.cases[batch_start:batch_end]
+
+            print(f"\n[Checkpoint] Processing batch {batch_start}-{batch_end}...")
+
+            tasks = [wrapped_task(case, batch_start + i) for i, case in enumerate(batch_cases)]
+            batch_results = await asyncio.gather(*tasks)
+            results.extend(batch_results)
+
+            # Save checkpoint
+            save_checkpoint(
+                batch_results,
+                CHECKPOINT_DIR,
+                checkpoint_counter,
+                DATASET_PATH.stem,
+                AZURE_DEPLOYMENT_NAME
+            )
+            checkpoint_counter += 1
+
+            print(f"[Checkpoint] Saved checkpoint {checkpoint_counter} ({len(batch_results)} results)")
+    else:
+        # Process all at once without checkpointing
+        tasks = [wrapped_task(case, i) for i, case in enumerate(dataset.cases)]
+        results = await asyncio.gather(*tasks)
 
     end_time = time.time()
     total_time = end_time - start_time
 
-    # Save results
-    print("\n========================[Saving Outputs]========================")
+    # Merge checkpoints if enabled
+    if CHECKPOINTING:
+        print("\n========================[Merging Checkpoints]========================")
+        merge_checkpoints(CHECKPOINT_DIR, OUTPUT_DIR, DATASET_PATH.stem, AZURE_DEPLOYMENT_NAME)
+        print(f"[Checkpoint] Merged all checkpoints into Output directory")
+    else:
+        # Save results normally
+        print("\n========================[Saving Outputs]========================")
 
-    # Fake "report" object to reuse write_eval_outputs()
-    class SimpleCase:
-        def __init__(self, inputs, output):
-            self.inputs = inputs
-            self.output = output
+        class SimpleCase:
+            def __init__(self, inputs, output):
+                self.inputs = inputs
+                self.output = output
 
-    class SimpleReport:
-        def __init__(self, cases):
-            self.cases = cases
+        class SimpleReport:
+            def __init__(self, cases):
+                self.cases = cases
 
-    fake_report = SimpleReport([
-        SimpleCase(r["prompt"], r) for r in results
-    ])
+        fake_report = SimpleReport([
+            SimpleCase(r["prompt"], r) for r in results
+        ])
 
-    write_eval_outputs(fake_report, OUTPUT_DIR, dataset_name=DATASET_PATH.stem, model_name=AZURE_DEPLOYMENT_NAME)
+        write_eval_outputs(fake_report, OUTPUT_DIR, dataset_name=DATASET_PATH.stem, model_name=AZURE_DEPLOYMENT_NAME)
 
     # Compute token totals
     total_input_tokens = sum((r["tester_input_tokens"] or 0) + (r["auditor_input_tokens"] or 0) for r in results)

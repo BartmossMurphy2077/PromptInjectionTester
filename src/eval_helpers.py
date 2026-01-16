@@ -19,6 +19,66 @@ def select_dataset(dataset_dir: Path) -> Path:
         print("Invalid selection, try again.")
 
 
+def save_checkpoint(results: list, checkpoint_dir: Path, checkpoint_num: int, dataset_name: str, model_name: str):
+    """Save a checkpoint of results to the Checkpoints directory."""
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    results_rows = []
+    token_logs_rows = []
+
+    for r in results:
+        results_rows.append({
+            "prompt": r.get("prompt"),
+            "response": r.get("response"),
+            "audit": r.get("audit_verdict"),
+            "explanation": r.get("audit_explanation"),
+            "severity": r.get("audit_severity"),
+            "category": r.get("audit_category"),
+            "model": model_name,
+        })
+        token_logs_rows.append({
+            "prompt": r.get("prompt"),
+            "tester_input_tokens": r.get("tester_input_tokens"),
+            "tester_output_tokens": r.get("tester_output_tokens"),
+            "auditor_input_tokens": r.get("auditor_input_tokens"),
+            "auditor_output_tokens": r.get("auditor_output_tokens"),
+            "model": model_name,
+        })
+
+    results_path = checkpoint_dir / f"checkpoint_{checkpoint_num}_results_{dataset_name}_{model_name}.csv"
+    token_logs_path = checkpoint_dir / f"checkpoint_{checkpoint_num}_token_logs_{dataset_name}_{model_name}.csv"
+
+    pd.DataFrame(results_rows).to_csv(results_path, index=False)
+    pd.DataFrame(token_logs_rows).to_csv(token_logs_path, index=False)
+
+
+def merge_checkpoints(checkpoint_dir: Path, output_dir: Path, dataset_name: str, model_name: str):
+    """Merge all checkpoint files into final output files in the Output directory."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Merge results checkpoints
+    results_checkpoints = sorted(checkpoint_dir.glob(f"checkpoint_*_results_{dataset_name}_{model_name}.csv"))
+    if results_checkpoints:
+        results_dfs = [pd.read_csv(f) for f in results_checkpoints]
+        merged_results = pd.concat(results_dfs, ignore_index=True)
+        results_path = output_dir / f"results_{dataset_name}_{model_name}.csv"
+        merged_results.to_csv(results_path, index=False)
+        print(f"[Checkpoint] Merged {len(results_checkpoints)} result checkpoints into {results_path}")
+
+    # Merge token logs checkpoints
+    token_checkpoints = sorted(checkpoint_dir.glob(f"checkpoint_*_token_logs_{dataset_name}_{model_name}.csv"))
+    if token_checkpoints:
+        token_dfs = [pd.read_csv(f) for f in token_checkpoints]
+        merged_tokens = pd.concat(token_dfs, ignore_index=True)
+        token_logs_path = output_dir / f"token_logs_{dataset_name}_{model_name}.csv"
+        merged_tokens.to_csv(token_logs_path, index=False)
+        print(f"[Checkpoint] Merged {len(token_checkpoints)} token log checkpoints into {token_logs_path}")
+
+    # Optionally clean up checkpoint files after successful merge
+    # for f in results_checkpoints + token_checkpoints:
+    #     f.unlink()
+
+
 def write_eval_outputs(report, output_dir: Path, dataset_name: str, model_name: str):
     """
     Walk through report.cases and write:
@@ -33,16 +93,13 @@ def write_eval_outputs(report, output_dir: Path, dataset_name: str, model_name: 
     token_logs_rows = []
 
     for case in report.cases:
-        # case may be ReportCase or ReportCaseFailure
-        # In the failure case, case.output may not exist
         if isinstance(case, ReportCaseFailure):
             inputs = case.inputs
-            # you might want to store the error
             results_rows.append({
                 "prompt": inputs,
                 "response": None,
                 "audit": None,
-                "explanation": f"Error: {case}",  # or case.error_message if available
+                "explanation": f"Error: {case}",
                 "severity": None,
                 "category": None,
                 "model": model_name,
@@ -56,7 +113,6 @@ def write_eval_outputs(report, output_dir: Path, dataset_name: str, model_name: 
                 "model": model_name,
             })
         else:
-            # normal ReportCase
             inputs = case.inputs
             out = case.output or {}
             results_rows.append({

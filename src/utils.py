@@ -31,3 +31,9 @@ RUN_LIMIT = 0
 #If 1, applies regex auto-flagging and sanitization before sending to auditor
 #If 0, sends raw prompts directly to auditor (useful when Azure prompt shield is enabled)
 PREPROCESS = 0
+
+#Checkpointing settings
+#If 1, enables checkpointing; if 0, checkpointing is disabled
+CHECKPOINTING = 1
+#Saves a checkpoint every X results
+CHECKPOINTING_LENGTH = 1000
