@@ -25,7 +25,7 @@ CONCURRENCY_LIMIT = 20
 #If True you will see token usage per request
 #If RUN_LIMIT > 0 the dataset will be limited to that many entries for faster testing
 DEBUG = True
-RUN_LIMIT = 100
+RUN_LIMIT = 500
 
 #Preprocessing settings
 #If 1, applies regex auto-flagging and sanitization before sending to auditor
